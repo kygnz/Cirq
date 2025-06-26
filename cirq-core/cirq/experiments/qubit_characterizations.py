@@ -505,6 +505,7 @@ def two_qubit_randomized_benchmarking(
     return RandomizedBenchMarkResult(num_clifford_range, gnd_probs)
 
 
+
 def single_qubit_state_tomography(
     sampler: cirq.Sampler, qubit: cirq.Qid, circuit: cirq.AbstractCircuit, repetitions: int = 1000
 ) -> TomographyResult:
@@ -527,18 +528,25 @@ def single_qubit_state_tomography(
     Returns:
         A TomographyResult object that stores and plots the density matrix.
     """
-    circuit_z = circuit + circuits.Circuit(ops.measure(qubit, key='z'))
+
+    keys = cirq.measurement_key_names(circuit)
+    tomo_key = "tomo_key"
+    while tomo_key in keys:
+        tomo_key = f"tomo_key{uuid.uuid4().hex}"
+
+    circuit_z = circuit + circuits.Circuit(ops.measure(qubit, key=tomo_key))
+
     results = sampler.run(circuit_z, repetitions=repetitions)
-    rho_11 = np.mean(results.measurements['z'])
+    rho_11 = np.mean(results.records[tomo_key][:, -1, :])
     rho_00 = 1.0 - rho_11
 
-    circuit_x = circuits.Circuit(circuit, ops.X(qubit) ** 0.5, ops.measure(qubit, key='z'))
+    circuit_x = circuits.Circuit(circuit, ops.X(qubit) ** 0.5, ops.measure(qubit, key=tomo_key))
     results = sampler.run(circuit_x, repetitions=repetitions)
-    rho_01_im = np.mean(results.measurements['z']) - 0.5
+    rho_01_im = np.mean(results.records[tomo_key][:, -1, :]) - 0.5
 
-    circuit_y = circuits.Circuit(circuit, ops.Y(qubit) ** -0.5, ops.measure(qubit, key='z'))
+    circuit_y = circuits.Circuit(circuit, ops.Y(qubit) ** -0.5, ops.measure(qubit, key=tomo_key))
     results = sampler.run(circuit_y, repetitions=repetitions)
-    rho_01_re = 0.5 - np.mean(results.measurements['z'])
+    rho_01_re = 0.5 - np.mean(results.records[tomo_key][:, -1, :])
 
     rho_01 = rho_01_re + 1j * rho_01_im
     rho_10 = np.conj(rho_01)
@@ -546,6 +554,26 @@ def single_qubit_state_tomography(
     rho = np.array([[rho_00, rho_01], [rho_10, rho_11]])
 
     return TomographyResult(rho)
+
+    # circuit_z = circuit + circuits.Circuit(ops.measure(qubit, key='z'))
+    # results = sampler.run(circuit_z, repetitions=repetitions)
+    # rho_11 = np.mean(results.measurements['z'])
+    # rho_00 = 1.0 - rho_11
+
+    # circuit_x = circuits.Circuit(circuit, ops.X(qubit) ** 0.5, ops.measure(qubit, key='z'))
+    # results = sampler.run(circuit_x, repetitions=repetitions)
+    # rho_01_im = np.mean(results.measurements['z']) - 0.5
+
+    # circuit_y = circuits.Circuit(circuit, ops.Y(qubit) ** -0.5, ops.measure(qubit, key='z'))
+    # results = sampler.run(circuit_y, repetitions=repetitions)
+    # rho_01_re = 0.5 - np.mean(results.measurements['z'])
+
+    # rho_01 = rho_01_re + 1j * rho_01_im
+    # rho_10 = np.conj(rho_01)
+
+    # rho = np.array([[rho_00, rho_01], [rho_10, rho_11]])
+
+    # return TomographyResult(rho)
 
 
 def two_qubit_state_tomography(
